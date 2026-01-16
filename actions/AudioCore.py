@@ -17,7 +17,7 @@ class InfoContent(enum.Enum):
     ADJUSTMENT = SimpleComboRowItem("adjustment", "Adjustment")
 
 
-class InfoContentLocation(enum.Enum):
+class ContentLocation(enum.Enum):
     TOP = SimpleComboRowItem("top", "Top")
     CENTER = SimpleComboRowItem("center", "Center")
     BOTTOM = SimpleComboRowItem("bottom", "Bottom")
@@ -53,10 +53,11 @@ class AudioCore(ActionCore):
 
         self.device_filter: DeviceFilter = None
         self.info_content = InfoContent.VOLUME.value
-        self.info_content_location = InfoContentLocation.BOTTOM.value
+        self.info_content_location = ContentLocation.BOTTOM.value
 
         self.show_device_name = True
         self.device_nick = ""
+        self.device_content_location = ContentLocation.TOP.value
 
         self.show_info_content = True
 
@@ -147,12 +148,9 @@ class AudioCore(ActionCore):
         self.info_content_location_row = ComboRow(
             action_core=self,
             var_name="info-content-location",
-            default_value=InfoContentLocation.BOTTOM.value,
-            items=[
-                info_content_location.value
-                for info_content_location in InfoContentLocation
-            ],
-            title="base-info-content-location",
+            default_value=ContentLocation.BOTTOM.value,
+            items=[content_location.value for content_location in ContentLocation],
+            title="base-content-location",
             complex_var_name=False,
             on_change=self.info_content_location_changed
         )
@@ -186,8 +184,19 @@ class AudioCore(ActionCore):
             on_change=self.device_nick_changed
         )
 
+        self.device_content_location_row = ComboRow(
+            action_core=self,
+            var_name="info-content-location",
+            default_value=ContentLocation.TOP.value,
+            items=[content_location.value for content_location in ContentLocation],
+            title="base-content-location",
+            complex_var_name=False,
+            on_change=self.device_content_location_changed
+        )
+
         self.device_name_expander.add_row(self.device_name_switch.widget)
         self.device_name_expander.add_row(self.device_nick_entry.widget)
+        self.device_name_expander.add_row(self.device_content_location_row.widget)
 
         self.device_filter = self.device_filter_combo_row.get_selected_item()
 
@@ -260,6 +269,7 @@ class AudioCore(ActionCore):
         self.set_top_label("")
         self.set_center_label("")
         self.set_bottom_label("")
+        self.display_device_name()
         self.display_device_info()
 
     def show_device_nick_changed(self, widget, value, old):
@@ -270,32 +280,48 @@ class AudioCore(ActionCore):
         self.device_nick = value
         self.display_device_name()
 
+    def device_content_location_changed(self, widget, value, old):
+        self.device_content_location = value
+        self.set_top_label("")
+        self.set_center_label("")
+        self.set_bottom_label("")
+        self.display_device_name()
+        self.display_device_info()
+
     ############ DISPLAY #############
 
+    def display_text(self, text, location_value):
+        match location_value:
+            case ContentLocation.TOP.value:
+                self.set_top_label(text)
+            case ContentLocation.CENTER.value:
+                self.set_center_label(text)
+            case ContentLocation.BOTTOM.value:
+                self.set_bottom_label(text)
+        return
+
     def display_device_name(self):
+        text = ""
+
         if not self.show_device_name:
-            self.set_top_label("")
+            self.display_text(text, self.device_content_location)
             return
 
         if not self.device_nick and not self.selected_device:
             return
 
         if self.device_nick and self.device_nick != "":
-            self.set_top_label(self.device_nick)
+            text = self.device_nick
         else:
-            self.set_top_label(self.selected_device.device_name)
+            text = self.selected_device.device_name
+
+        self.display_text(text, self.device_content_location)
 
     def display_device_info(self):
         text = ""
 
         if not self.show_info_content:
-            match self.info_content_location:
-                case InfoContentLocation.TOP.value:
-                    self.set_top_label(text)
-                case InfoContentLocation.CENTER.value:
-                    self.set_center_label(text)
-                case InfoContentLocation.BOTTOM.value:
-                    self.set_bottom_label(text)
+            self.display_text(text, self.info_content_location)
             return
 
         match self.info_content:
@@ -306,13 +332,7 @@ class AudioCore(ActionCore):
             case _:
                 return
 
-        match self.info_content_location:
-            case InfoContentLocation.TOP.value:
-                self.set_top_label(text)
-            case InfoContentLocation.CENTER.value:
-                self.set_center_label(text)
-            case InfoContentLocation.BOTTOM.value:
-                self.set_bottom_label(text)
+        self.display_text(text, self.info_content_location)
 
     def display_volume(self):
         if not self.device_filter or not self.selected_device:
